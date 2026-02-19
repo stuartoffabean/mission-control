@@ -1,52 +1,72 @@
 #!/usr/bin/env node
+// Sync paper trades from weather-v2 + directional into Convex
 const { ConvexHttpClient } = require("convex/browser");
 const { api } = require("../convex/_generated/api");
 const fs = require("fs");
 
 const client = new ConvexHttpClient("https://gallant-cormorant-222.convex.cloud");
+const MIN_PRICE = 0.02; // Skip dust trades
 
 async function main() {
-  const weatherData = JSON.parse(
-    fs.readFileSync("/data/workspace/polymarket-bot/weather-v2-paper.json", "utf8")
-  );
+  // First: clear all existing trades (they were synced from recommendations, not real paperTrades)
+  const clearExisting = process.argv.includes("--reset");
 
-  let trades = [];
-  for (const run of weatherData.runs || []) {
-    for (const rec of run.recommendations || []) {
-      if (!rec.action?.startsWith("BUY")) continue;
-      trades.push({
-        market: rec.question || `${rec.city} ${rec.date} ${rec.bucket}${rec.unit}`,
-        side: rec.action === "BUY_YES" ? "yes" : "no",
-        shares: Math.floor(10 / Math.max(rec.marketPrice || 0.5, 0.001)),
-        price: rec.marketPrice || 0,
-        amount: 10,
+  // --- Weather paper trades (from root paperTrades array) ---
+  const weatherPath = "/data/workspace/polymarket-bot/weather-v2-paper.json";
+  let weatherCount = 0;
+  if (fs.existsSync(weatherPath)) {
+    const data = JSON.parse(fs.readFileSync(weatherPath, "utf8"));
+    const paperTrades = data.paperTrades || [];
+    
+    for (const t of paperTrades) {
+      const price = t.entryPrice || t.gammaMid || 0;
+      if (price < MIN_PRICE) continue; // skip dust
+      
+      const shares = t.shares || (t.totalCost ? Math.floor(t.totalCost / Math.max(price, 0.001)) : 0);
+      if (shares <= 0) continue;
+
+      await client.mutation(api.trading.addTrade, {
+        market: t.question || `${t.city} ${t.bucket}${t.unit} ${t.date}`,
+        side: (t.action === "BUY_YES" ? "yes" : "no"),
+        shares,
+        price,
+        amount: t.totalCost || shares * price,
         type: "buy",
+        mode: "paper",
+        strategy: "weather-v2",
+        result: t.resolved ? (t.won ? "win" : "loss") : "pending",
+        pnl: t.dollarPnl || undefined,
       });
+      weatherCount++;
     }
   }
 
-  console.log(`Syncing ${trades.length} paper trades...`);
+  // --- Directional paper trades ---
+  const dirPath = "/data/workspace/polymarket-bot/directional-paper.json";
+  let dirCount = 0;
+  if (fs.existsSync(dirPath)) {
+    const data = JSON.parse(fs.readFileSync(dirPath, "utf8"));
+    for (const t of data.paperTrades || []) {
+      const price = t.entryPrice || 0;
+      if (price < MIN_PRICE) continue;
 
-  // Portfolio snapshot
-  await client.mutation(api.trading.addSnapshot, {
-    totalValue: 325.40,
-    cashBalance: 325.40,
-    unrealizedPnl: 0,
-    realizedPnl: -123.18,
-  });
-  console.log("Portfolio snapshot added");
-
-  let count = 0;
-  for (const trade of trades) {
-    try {
-      await client.mutation(api.trading.addTrade, trade);
-      count++;
-      if (count % 20 === 0) console.log(`  ${count}/${trades.length}`);
-    } catch (e) {
-      console.error(`Failed: ${trade.market.slice(0,40)} — ${e.message.slice(0,80)}`);
+      await client.mutation(api.trading.addTrade, {
+        market: t.question || "Unknown",
+        side: t.action === "BUY_YES" ? "yes" : "no",
+        shares: t.shares || Math.floor((t.totalCost || 10) / Math.max(price, 0.001)),
+        price,
+        amount: t.totalCost || 10,
+        type: "buy",
+        mode: "paper",
+        strategy: "directional",
+        result: t.resolved ? (t.won ? "win" : "loss") : "pending",
+        pnl: t.dollarPnl || undefined,
+      });
+      dirCount++;
     }
   }
-  console.log(`Done: ${count}/${trades.length} trades synced`);
+
+  console.log(JSON.stringify({ ok: true, weather: weatherCount, directional: dirCount }));
 }
 
 main().catch(console.error);

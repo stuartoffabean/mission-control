@@ -183,3 +183,14 @@ export const backfillMode = mutation({
     return { updated, total: trades.length };
   },
 });
+
+export const clearAllTrades = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const trades = await ctx.db.query("trades").collect();
+    for (const t of trades) {
+      await ctx.db.delete(t._id);
+    }
+    return { deleted: trades.length };
+  },
+});

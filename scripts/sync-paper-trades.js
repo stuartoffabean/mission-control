@@ -16,7 +16,9 @@ async function main() {
     
     for (const t of paperTrades) {
       // Paper trades use gammaMid or marketPrice as entry reference
-      const price = t.entryPrice || t.gammaMid || t.marketPrice || 0;
+      // For BUY_NO, actual entry = 1 - marketPrice (we're buying the NO side)
+      let rawPrice = t.entryPrice || t.gammaMid || t.marketPrice || 0;
+      const price = t.action === "BUY_NO" ? (1 - rawPrice) : rawPrice;
       if (price < MIN_PRICE) continue;
       
       const shares = t.shares || (t.totalCost ? Math.floor(t.totalCost / Math.max(price, 0.001)) : Math.floor(10 / Math.max(price, 0.001)));

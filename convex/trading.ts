@@ -194,3 +194,20 @@ export const clearAllTrades = mutation({
     return { deleted: trades.length };
   },
 });
+
+export const updateTradePrice = mutation({
+  args: {
+    id: v.id("trades"),
+    currentPrice: v.optional(v.number()),
+    pnl: v.optional(v.number()),
+    result: v.optional(v.union(v.literal("win"), v.literal("loss"), v.literal("pending"))),
+  },
+  handler: async (ctx, args) => {
+    const { id, ...updates } = args;
+    const filtered: Record<string, any> = {};
+    for (const [k, v] of Object.entries(updates)) {
+      if (v !== undefined) filtered[k] = v;
+    }
+    await ctx.db.patch(id, filtered);
+  },
+});

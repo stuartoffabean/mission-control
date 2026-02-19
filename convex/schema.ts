@@ -53,6 +53,8 @@ export default defineSchema({
     strategy: v.optional(v.string()),
     result: v.optional(v.union(v.literal("win"), v.literal("loss"), v.literal("pending"))),
     pnl: v.optional(v.number()),
+    currentPrice: v.optional(v.number()),
+    tokenId: v.optional(v.string()),
     timestamp: v.number(),
   }),
   

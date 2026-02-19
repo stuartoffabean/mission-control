@@ -155,12 +155,17 @@ function TradeList({ mode }: { mode: Mode }) {
                 </div>
                 <div className="text-right ml-4">
                   <div className="font-bold">${trade.amount.toFixed(2)}</div>
-                  {trade.result && trade.result !== "pending" && (
-                    <div className={`text-xs font-medium ${trade.result === "win" ? 'text-green-400' : 'text-red-400'}`}>
-                      {trade.result === "win" ? "✅" : "❌"} {trade.pnl != null ? `$${trade.pnl.toFixed(2)}` : ""}
+                  {trade.currentPrice != null && trade.currentPrice > 0 && (!trade.result || trade.result === "pending") && (
+                    <div className={`text-xs font-medium ${(trade.currentPrice - trade.price) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      Now: {(trade.currentPrice * 100).toFixed(0)}¢ ({((trade.currentPrice - trade.price) / trade.price * 100).toFixed(0)}%)
                     </div>
                   )}
-                  {(!trade.result || trade.result === "pending") && (
+                  {trade.result && trade.result !== "pending" && (
+                    <div className={`text-xs font-medium ${trade.result === "win" ? 'text-green-400' : 'text-red-400'}`}>
+                      {trade.result === "win" ? "✅" : "❌"} {trade.pnl != null ? `${trade.pnl >= 0 ? '+' : ''}$${trade.pnl.toFixed(2)}` : ""}
+                    </div>
+                  )}
+                  {(!trade.result || trade.result === "pending") && !trade.currentPrice && (
                     <div className="text-xs text-yellow-400">⏳ pending</div>
                   )}
                 </div>

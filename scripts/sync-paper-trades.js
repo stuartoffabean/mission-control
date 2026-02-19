@@ -34,8 +34,8 @@ async function main() {
         type: "buy",
         mode: "paper",
         strategy: "weather-v2",
-        result: t.resolved ? (t.won ? "win" : "loss") : "pending",
-        pnl: t.dollarPnl || undefined,
+        result: t.resolution === "WIN" ? "win" : t.resolution === "LOSS" ? "loss" : "pending",
+        pnl: t.resolution === "WIN" ? (t.totalCost ? (t.totalCost / price) - t.totalCost : undefined) : t.resolution === "LOSS" ? -(t.totalCost || 0) : undefined,
       });
       weatherCount++;
     }

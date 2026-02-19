@@ -2,26 +2,80 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
 export const getPositions = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db.query("positions")
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+  args: { mode: v.optional(v.union(v.literal("live"), v.literal("paper"))) },
+  handler: async (ctx, args) => {
+    let q = ctx.db.query("positions").filter((q) => q.eq(q.field("isActive"), true));
+    return await q.collect();
   },
 });
 
 export const getTrades = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { mode: v.optional(v.union(v.literal("live"), v.literal("paper"))) },
+  handler: async (ctx, args) => {
+    if (args.mode) {
+      return await ctx.db.query("trades")
+        .filter((q) => q.eq(q.field("mode"), args.mode))
+        .order("desc")
+        .take(500);
+    }
     return await ctx.db.query("trades")
       .order("desc")
-      .take(50);
+      .take(500);
+  },
+});
+
+export const getTradeStats = query({
+  args: { mode: v.union(v.literal("live"), v.literal("paper")) },
+  handler: async (ctx, args) => {
+    const trades = await ctx.db.query("trades")
+      .filter((q) => q.eq(q.field("mode"), args.mode))
+      .collect();
+    
+    const buys = trades.filter(t => t.type === "buy");
+    const wins = trades.filter(t => t.result === "win");
+    const losses = trades.filter(t => t.result === "loss");
+    const pending = trades.filter(t => !t.result || t.result === "pending");
+    const totalPnl = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const totalInvested = buys.reduce((sum, t) => sum + t.amount, 0);
+
+    // Group by strategy
+    const byStrategy: Record<string, { count: number; pnl: number; wins: number; losses: number }> = {};
+    for (const t of trades) {
+      const s = t.strategy || "unknown";
+      if (!byStrategy[s]) byStrategy[s] = { count: 0, pnl: 0, wins: 0, losses: 0 };
+      byStrategy[s].count++;
+      byStrategy[s].pnl += t.pnl || 0;
+      if (t.result === "win") byStrategy[s].wins++;
+      if (t.result === "loss") byStrategy[s].losses++;
+    }
+
+    return {
+      total: trades.length,
+      buys: buys.length,
+      wins: wins.length,
+      losses: losses.length,
+      pending: pending.length,
+      winRate: wins.length + losses.length > 0 
+        ? (wins.length / (wins.length + losses.length) * 100).toFixed(1) 
+        : "N/A",
+      totalPnl,
+      totalInvested,
+      byStrategy,
+    };
   },
 });
 
 export const getPortfolio = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { mode: v.optional(v.union(v.literal("live"), v.literal("paper"))) },
+  handler: async (ctx, args) => {
+    if (args.mode) {
+      // Get latest snapshot for this mode
+      const snapshots = await ctx.db.query("portfolioSnapshots")
+        .filter((q) => q.eq(q.field("mode"), args.mode))
+        .order("desc")
+        .first();
+      return snapshots;
+    }
     return await ctx.db.query("portfolioSnapshots")
       .order("desc")
       .first();
@@ -39,7 +93,6 @@ export const upsertPosition = mutation({
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
-    // Check if position already exists
     const existingPosition = await ctx.db.query("positions")
       .filter((q) => q.and(
         q.eq(q.field("market"), args.market),
@@ -48,7 +101,6 @@ export const upsertPosition = mutation({
       .first();
 
     if (existingPosition) {
-      // Update existing position
       await ctx.db.patch(existingPosition._id, {
         shares: args.shares,
         entryPrice: args.entryPrice,
@@ -58,7 +110,6 @@ export const upsertPosition = mutation({
       });
       return existingPosition._id;
     } else {
-      // Create new position
       return await ctx.db.insert("positions", args);
     }
   },
@@ -72,13 +123,28 @@ export const addTrade = mutation({
     price: v.number(),
     amount: v.number(),
     type: v.union(v.literal("buy"), v.literal("sell")),
+    mode: v.optional(v.union(v.literal("live"), v.literal("paper"))),
+    strategy: v.optional(v.string()),
+    result: v.optional(v.union(v.literal("win"), v.literal("loss"), v.literal("pending"))),
+    pnl: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const trade = await ctx.db.insert("trades", {
+    return await ctx.db.insert("trades", {
       ...args,
+      mode: args.mode || "paper",
       timestamp: Date.now(),
     });
-    return trade;
+  },
+});
+
+export const updateTradeResult = mutation({
+  args: {
+    id: v.id("trades"),
+    result: v.union(v.literal("win"), v.literal("loss")),
+    pnl: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { result: args.result, pnl: args.pnl });
   },
 });
 
@@ -88,12 +154,32 @@ export const addSnapshot = mutation({
     cashBalance: v.number(),
     unrealizedPnl: v.number(),
     realizedPnl: v.number(),
+    mode: v.optional(v.union(v.literal("live"), v.literal("paper"))),
   },
   handler: async (ctx, args) => {
-    const snapshot = await ctx.db.insert("portfolioSnapshots", {
+    return await ctx.db.insert("portfolioSnapshots", {
       ...args,
       timestamp: Date.now(),
     });
-    return snapshot;
+  },
+});
+
+export const backfillMode = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const trades = await ctx.db.query("trades").collect();
+    let updated = 0;
+    for (const t of trades) {
+      if (!t.mode) {
+        const m = (t.market || "").toLowerCase();
+        let strategy = "weather-v2";
+        if (m.includes("hawks") || m.includes("pacers") || m.includes("76ers") || m.includes("wizards") || m.includes("vs.")) {
+          strategy = "directional";
+        }
+        await ctx.db.patch(t._id, { mode: "paper", strategy, result: "pending" });
+        updated++;
+      }
+    }
+    return { updated, total: trades.length };
   },
 });

@@ -49,6 +49,10 @@ export default defineSchema({
     price: v.number(),
     amount: v.number(),
     type: v.union(v.literal("buy"), v.literal("sell")),
+    mode: v.optional(v.union(v.literal("live"), v.literal("paper"))),
+    strategy: v.optional(v.string()),
+    result: v.optional(v.union(v.literal("win"), v.literal("loss"), v.literal("pending"))),
+    pnl: v.optional(v.number()),
     timestamp: v.number(),
   }),
   
@@ -58,6 +62,7 @@ export default defineSchema({
     cashBalance: v.number(),
     unrealizedPnl: v.number(),
     realizedPnl: v.number(),
+    mode: v.optional(v.union(v.literal("live"), v.literal("paper"))),
   }),
   
   agents: defineTable({

@@ -1,77 +1,9 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Monitor, Coffee, Wifi, Zap, Clock } from "lucide-react";
-
-// Office layout with workstations
-const workstations = [
-  {
-    id: 1,
-    agent: "Stuart",
-    avatar: "🤖",
-    position: { x: 20, y: 20 },
-    status: "working" as const,
-    currentTask: "Building Mission Control Dashboard",
-    workstation: "main-desk",
-    lastActivity: Date.now() - 300000,
-    tools: ["Terminal", "Browser", "Code Editor"],
-  },
-  {
-    id: 2,
-    agent: "Builder",
-    avatar: "👨‍💻",
-    position: { x: 60, y: 25 },
-    status: "idle" as const,
-    currentTask: null,
-    workstation: "dev-station",
-    lastActivity: Date.now() - 3600000,
-    tools: ["VS Code", "Docker", "Git"],
-  },
-  {
-    id: 3,
-    agent: "Scanner",
-    avatar: "📊",
-    position: { x: 15, y: 60 },
-    status: "working" as const,
-    currentTask: "Analyzing NBA MVP odds",
-    workstation: "analytics-hub",
-    lastActivity: Date.now() - 900000,
-    tools: ["Jupyter", "Python", "APIs"],
-  },
-  {
-    id: 4,
-    agent: "Research",
-    avatar: "🔍",
-    position: { x: 75, y: 65 },
-    status: "working" as const,
-    currentTask: "Investigating Polymarket API",
-    workstation: "research-station",
-    lastActivity: Date.now() - 600000,
-    tools: ["Browser", "Notes", "Archive"],
-  },
-  {
-    id: 5,
-    agent: "Nightwatch",
-    avatar: "🌙",
-    position: { x: 45, y: 75 },
-    status: "idle" as const,
-    currentTask: null,
-    workstation: "monitoring-center",
-    lastActivity: Date.now() - 28800000,
-    tools: ["Logs", "Alerts", "Dashboards"],
-  },
-  {
-    id: 6,
-    agent: "Writer",
-    avatar: "✍️",
-    position: { x: 35, y: 40 },
-    status: "idle" as const,
-    currentTask: null,
-    workstation: "creative-corner",
-    lastActivity: Date.now() - 7200000,
-    tools: ["Editor", "Docs", "References"],
-  },
-];
+import { Monitor, Coffee, Wifi, Zap, Clock, Loader2 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 // Office furniture and elements
 const officeElements = [
@@ -80,6 +12,16 @@ const officeElements = [
   { type: "printer", icon: "🖨️", position: { x: 10, y: 85 }, label: "Printer" },
   { type: "plant", icon: "🪴", position: { x: 90, y: 40 }, label: "Office Plant" },
   { type: "whiteboard", icon: "📋", position: { x: 5, y: 5 }, label: "Whiteboard" },
+];
+
+// Predefined positions for agents to spread them around the office
+const workstationPositions = [
+  { x: 20, y: 20 },
+  { x: 60, y: 25 },
+  { x: 15, y: 60 },
+  { x: 75, y: 65 },
+  { x: 45, y: 75 },
+  { x: 35, y: 40 },
 ];
 
 function getStatusAnimation(status: string) {
@@ -111,7 +53,27 @@ function formatLastActivity(timestamp: number): string {
 }
 
 export default function OfficePage() {
-  const activeAgents = workstations.filter(w => w.status === 'working').length;
+  const agents = useQuery(api.agents.list) || [];
+
+  if (agents === undefined) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading office...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Map agents to workstations with positions
+  const workstations = agents.map((agent: any, index: number) => ({
+    ...agent,
+    position: workstationPositions[index % workstationPositions.length],
+    id: agent._id,
+  }));
+
+  const activeAgents = agents.filter((a: any) => a.status === 'working').length;
 
   return (
     <div className="h-full overflow-auto">
@@ -168,7 +130,7 @@ export default function OfficePage() {
             ))}
 
             {/* Agent Workstations */}
-            {workstations.map((station) => (
+            {workstations.map((station: any) => (
               <div
                 key={station.id}
                 className="absolute transform -translate-x-1/2 -translate-y-1/2"
@@ -196,7 +158,7 @@ export default function OfficePage() {
 
                   {/* Agent Info */}
                   <div className="space-y-1">
-                    <div className="font-medium text-sm">{station.agent}</div>
+                    <div className="font-medium text-sm">{station.name}</div>
                     <div className={`text-xs px-2 py-1 rounded-full ${
                       station.status === 'working' ? 'bg-green-500/20 text-green-400' :
                       station.status === 'idle' ? 'bg-yellow-500/20 text-yellow-400' :
@@ -206,12 +168,10 @@ export default function OfficePage() {
                     </div>
                   </div>
 
-                  {/* Current Task */}
-                  {station.currentTask && (
-                    <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
-                      {station.currentTask}
-                    </div>
-                  )}
+                  {/* Role */}
+                  <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
+                    {station.role}
+                  </div>
 
                   {/* Activity Indicator */}
                   <div className="absolute -top-1 -right-1">
@@ -250,49 +210,53 @@ export default function OfficePage() {
         </Card>
 
         {/* Detailed Agent Status */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {workstations.map((station) => (
-            <Card key={station.id}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xl">{station.avatar}</span>
-                    <span className="font-medium">{station.agent}</span>
+        {agents.length === 0 ? (
+          <Card>
+            <CardContent className="flex items-center justify-center h-32">
+              <p className="text-muted-foreground">No agents found</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {agents.map((agent: any) => (
+              <Card key={agent._id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xl">{agent.avatar}</span>
+                      <span className="font-medium">{agent.name}</span>
+                    </div>
+                    <div className={`px-2 py-1 rounded text-xs ${
+                      agent.status === 'working' ? 'bg-green-500/20 text-green-400' :
+                      agent.status === 'idle' ? 'bg-yellow-500/20 text-yellow-400' :
+                      'bg-gray-500/20 text-gray-400'
+                    }`}>
+                      {agent.status}
+                    </div>
                   </div>
-                  <div className={`px-2 py-1 rounded text-xs ${
-                    station.status === 'working' ? 'bg-green-500/20 text-green-400' :
-                    station.status === 'idle' ? 'bg-yellow-500/20 text-yellow-400' :
-                    'bg-gray-500/20 text-gray-400'
-                  }`}>
-                    {station.status}
-                  </div>
-                </div>
 
-                {station.currentTask && (
                   <div className="text-sm mb-2">
-                    <span className="text-muted-foreground">Task: </span>
-                    {station.currentTask}
+                    <span className="text-muted-foreground">Role: </span>
+                    {agent.role}
                   </div>
-                )}
 
-                <div className="text-xs text-muted-foreground mb-2">
-                  Last activity: {formatLastActivity(station.lastActivity)}
-                </div>
+                  <div className="text-sm mb-2 text-muted-foreground">
+                    {agent.description}
+                  </div>
 
-                <div className="flex flex-wrap gap-1">
-                  {station.tools.map((tool) => (
-                    <span
-                      key={tool}
-                      className="inline-flex items-center px-2 py-1 rounded text-xs bg-secondary"
-                    >
-                      {tool}
-                    </span>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Last activity: {formatLastActivity(agent.lastActive)}
+                  </div>
+
+                  <div className="text-xs">
+                    <span className="text-muted-foreground">Tasks completed: </span>
+                    <span className="font-bold">{agent.tasksCompleted}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

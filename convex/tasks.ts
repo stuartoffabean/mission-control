@@ -42,3 +42,35 @@ export const updateStatus = mutation({
     });
   },
 });
+
+export const update = mutation({
+  args: {
+    id: v.id("tasks"),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    priority: v.optional(v.union(v.literal("low"), v.literal("medium"), v.literal("high"), v.literal("critical"))),
+    assignee: v.optional(v.union(v.literal("Stuart"), v.literal("Micky"))),
+  },
+  handler: async (ctx, args) => {
+    const { id, ...updates } = args;
+    const validUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
+    );
+    
+    if (Object.keys(validUpdates).length > 0) {
+      await ctx.db.patch(id, {
+        ...validUpdates,
+        updatedAt: Date.now(),
+      });
+    }
+  },
+});
+
+export const remove = mutation({
+  args: {
+    id: v.id("tasks"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.id);
+  },
+});

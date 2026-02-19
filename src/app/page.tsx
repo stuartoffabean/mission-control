@@ -2,47 +2,12 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, User, AlertTriangle, Clock, CheckCircle } from "lucide-react";
-
-// Mock data - in real app this would come from Convex
-const mockTasks = [
-  {
-    id: 1,
-    title: "Set up Polymarket scanner alerts",
-    description: "Configure real-time alerts for high-volume markets with unusual price movements",
-    assignee: "Stuart" as const,
-    priority: "high" as const,
-    status: "in-progress" as const,
-    createdAt: Date.now() - 86400000,
-  },
-  {
-    id: 2,
-    title: "Research TikTok engagement patterns",
-    description: "Analyze best posting times and content types for Aria Sole",
-    assignee: "Micky" as const,
-    priority: "medium" as const,
-    status: "backlog" as const,
-    createdAt: Date.now() - 172800000,
-  },
-  {
-    id: 3,
-    title: "Deploy Mission Control dashboard",
-    description: "Build and deploy the NextJS + Convex mission control system",
-    assignee: "Stuart" as const,
-    priority: "critical" as const,
-    status: "in-progress" as const,
-    createdAt: Date.now() - 7200000,
-  },
-  {
-    id: 4,
-    title: "Review daily market positions",
-    description: "Check P&L and adjust position sizes based on risk metrics",
-    assignee: "Stuart" as const,
-    priority: "medium" as const,
-    status: "done" as const,
-    createdAt: Date.now() - 259200000,
-  },
-];
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Plus, User, AlertTriangle, Clock, CheckCircle, Loader2 } from "lucide-react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { useState } from "react";
 
 const columns = [
   { id: "backlog", title: "Backlog", icon: Clock },
@@ -60,9 +25,12 @@ function getPriorityColor(priority: string) {
   }
 }
 
-function TaskCard({ task }: { task: typeof mockTasks[0] }) {
+function TaskCard({ task, onStatusChange }: { 
+  task: any, 
+  onStatusChange: (taskId: any, newStatus: string) => void 
+}) {
   return (
-    <Card className={`mb-4 ${getPriorityColor(task.priority)}`}>
+    <Card className={`mb-4 ${getPriorityColor(task.priority)} cursor-pointer hover:shadow-md transition-shadow`}>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <CardTitle className="text-sm font-medium">{task.title}</CardTitle>
@@ -75,13 +43,21 @@ function TaskCard({ task }: { task: typeof mockTasks[0] }) {
       <CardContent className="pt-0">
         <p className="text-xs text-muted-foreground mb-2">{task.description}</p>
         <div className="flex items-center justify-between">
-          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+          <button
+            onClick={() => {
+              const statusOrder = ["backlog", "in-progress", "done"];
+              const currentIndex = statusOrder.indexOf(task.status);
+              const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
+              onStatusChange(task._id, nextStatus);
+            }}
+            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium hover:opacity-80
             ${task.priority === 'critical' ? 'bg-red-500/20 text-red-400' :
               task.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
               task.priority === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
-              'bg-green-500/20 text-green-400'}`}>
+              'bg-green-500/20 text-green-400'}`}
+          >
             {task.priority}
-          </span>
+          </button>
           <span className="text-xs text-muted-foreground">
             {new Date(task.createdAt).toLocaleDateString()}
           </span>
@@ -91,7 +67,116 @@ function TaskCard({ task }: { task: typeof mockTasks[0] }) {
   );
 }
 
+function AddTaskForm({ onClose }: { onClose: () => void }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [assignee, setAssignee] = useState<"Stuart" | "Micky">("Stuart");
+  const [priority, setPriority] = useState<"low" | "medium" | "high" | "critical">("medium");
+  
+  const createTask = useMutation(api.tasks.create);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    
+    await createTask({
+      title,
+      description,
+      assignee,
+      priority,
+    });
+    
+    setTitle("");
+    setDescription("");
+    onClose();
+  };
+
+  return (
+    <Card className="mb-4 border-dashed">
+      <CardContent className="p-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="title">Task Title</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter task title..."
+              autoFocus
+            />
+          </div>
+          <div>
+            <Label htmlFor="description">Description</Label>
+            <Input
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter task description..."
+            />
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <Label htmlFor="assignee">Assignee</Label>
+              <select
+                id="assignee"
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value as "Stuart" | "Micky")}
+                className="w-full px-3 py-2 bg-background border border-input rounded-md"
+              >
+                <option value="Stuart">Stuart</option>
+                <option value="Micky">Micky</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <Label htmlFor="priority">Priority</Label>
+              <select
+                id="priority"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as any)}
+                className="w-full px-3 py-2 bg-background border border-input rounded-md"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit">Add Task</Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function TasksPage() {
+  const tasks = useQuery(api.tasks.get) || [];
+  const updateStatus = useMutation(api.tasks.updateStatus);
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const handleStatusChange = async (taskId: any, newStatus: string) => {
+    await updateStatus({
+      id: taskId,
+      status: newStatus as "backlog" | "in-progress" | "done",
+    });
+  };
+
+  if (tasks === undefined) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading tasks...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-auto">
       <div className="p-6">
@@ -102,7 +187,7 @@ export default function TasksPage() {
               Track all tasks, assignments, and progress in real-time
             </p>
           </div>
-          <Button>
+          <Button onClick={() => setShowAddForm(!showAddForm)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Task
           </Button>
@@ -111,7 +196,7 @@ export default function TasksPage() {
         <div className="grid grid-cols-3 gap-6">
           {columns.map((column) => {
             const Icon = column.icon;
-            const tasksInColumn = mockTasks.filter(task => task.status === column.id);
+            const tasksInColumn = tasks.filter((task: any) => task.status === column.id);
             
             return (
               <div key={column.id} className="space-y-4">
@@ -124,8 +209,16 @@ export default function TasksPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  {tasksInColumn.map((task) => (
-                    <TaskCard key={task.id} task={task} />
+                  {column.id === "backlog" && showAddForm && (
+                    <AddTaskForm onClose={() => setShowAddForm(false)} />
+                  )}
+                  
+                  {tasksInColumn.map((task: any) => (
+                    <TaskCard 
+                      key={task._id} 
+                      task={task} 
+                      onStatusChange={handleStatusChange}
+                    />
                   ))}
                 </div>
                 

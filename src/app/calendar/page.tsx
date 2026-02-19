@@ -1,57 +1,11 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Play, Pause, AlertCircle, CheckCircle } from "lucide-react";
+import { Clock, Play, Pause, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
-// Mock cron jobs and scheduled tasks
-const cronJobs = [
-  {
-    id: 1,
-    name: "Weather Scanner v2",
-    schedule: "Every 2 hours",
-    description: "Scan weather-related prediction markets for arbitrage opportunities",
-    lastRun: Date.now() - 7200000,
-    nextRun: Date.now() + 7200000,
-    status: "active" as const,
-  },
-  {
-    id: 2,
-    name: "Directional Scanner",
-    schedule: "Every 2 hours (offset 30min)",
-    description: "Analyze market momentum and directional betting patterns",
-    lastRun: Date.now() - 5400000,
-    nextRun: Date.now() + 9000000,
-    status: "active" as const,
-  },
-  {
-    id: 3,
-    name: "GitHub Backup",
-    schedule: "Every 6 hours",
-    description: "Backup workspace and commit changes to repository",
-    lastRun: Date.now() - 10800000,
-    nextRun: Date.now() + 10800000,
-    status: "active" as const,
-  },
-  {
-    id: 4,
-    name: "Daily Stats Tracker",
-    schedule: "Daily at 9 AM PST",
-    description: "Collect TikTok and Instagram analytics for Aria Sole",
-    lastRun: Date.now() - 43200000,
-    nextRun: Date.now() + 64800000,
-    status: "paused" as const,
-  },
-  {
-    id: 5,
-    name: "Memory Maintenance",
-    schedule: "Weekly on Sundays",
-    description: "Review and organize memory files, update MEMORY.md",
-    lastRun: Date.now() - 518400000,
-    nextRun: Date.now() + 86400000,
-    status: "active" as const,
-  },
-];
-
+// Keep some mock upcoming events since they're not in the schema yet
 const upcomingEvents = [
   {
     id: 1,
@@ -92,12 +46,27 @@ function formatTimeUntil(timestamp: number): string {
     return `${days}d ${hours % 24}h`;
   } else if (hours > 0) {
     return `${hours}h ${minutes}m`;
-  } else {
+  } else if (diff > 0) {
     return `${minutes}m`;
+  } else {
+    return "overdue";
   }
 }
 
 export default function CalendarPage() {
+  const cronJobs = useQuery(api.cronJobs.list) || [];
+
+  if (cronJobs === undefined) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading cron jobs...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-auto">
       <div className="p-6 space-y-6">
@@ -116,35 +85,45 @@ export default function CalendarPage() {
                 <CardTitle>Active Cron Jobs</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {cronJobs.map((job) => (
-                    <div key={job.id} className="p-4 border rounded-lg">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          {getStatusIcon(job.status)}
-                          <h3 className="font-medium">{job.name}</h3>
+                {cronJobs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No cron jobs found
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {cronJobs.map((job: any) => (
+                      <div key={job._id} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            {getStatusIcon(job.status)}
+                            <h3 className="font-medium">{job.name}</h3>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{job.schedule}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">{job.schedule}</span>
-                      </div>
-                      
-                      <p className="text-sm text-muted-foreground mb-3">{job.description}</p>
-                      
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center space-x-4">
-                          <span>Last: {new Date(job.lastRun).toLocaleString()}</span>
-                          <span>Next: {formatTimeUntil(job.nextRun)}</span>
+                        
+                        <p className="text-sm text-muted-foreground mb-3">{job.description}</p>
+                        
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center space-x-4">
+                            <span>
+                              Last: {job.lastRun ? new Date(job.lastRun).toLocaleString() : 'Never'}
+                            </span>
+                            <span>
+                              Next: {job.nextRun ? formatTimeUntil(job.nextRun) : 'Not scheduled'}
+                            </span>
+                          </div>
+                          <span className={`px-2 py-1 rounded-full ${
+                            job.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                            job.status === 'paused' ? 'bg-yellow-500/20 text-yellow-400' :
+                            'bg-red-500/20 text-red-400'
+                          }`}>
+                            {job.status}
+                          </span>
                         </div>
-                        <span className={`px-2 py-1 rounded-full ${
-                          job.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                          job.status === 'paused' ? 'bg-yellow-500/20 text-yellow-400' :
-                          'bg-red-500/20 text-red-400'
-                        }`}>
-                          {job.status}
-                        </span>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -183,25 +162,28 @@ export default function CalendarPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Active Jobs</span>
                     <span className="font-bold text-green-400">
-                      {cronJobs.filter(job => job.status === 'active').length}
+                      {cronJobs.filter((job: any) => job.status === 'active').length}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Paused</span>
                     <span className="font-bold text-yellow-400">
-                      {cronJobs.filter(job => job.status === 'paused').length}
+                      {cronJobs.filter((job: any) => job.status === 'paused').length}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Errors</span>
                     <span className="font-bold text-red-400">
-                      0
+                      {cronJobs.filter((job: any) => job.status === 'error').length}
                     </span>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t">
                     <span className="text-sm">Next Job</span>
                     <span className="font-bold">
-                      {formatTimeUntil(Math.min(...cronJobs.map(job => job.nextRun)))}
+                      {cronJobs.length > 0 && cronJobs.some((job: any) => job.nextRun) 
+                        ? formatTimeUntil(Math.min(...cronJobs.filter((job: any) => job.nextRun).map((job: any) => job.nextRun)))
+                        : 'None scheduled'
+                      }
                     </span>
                   </div>
                 </div>

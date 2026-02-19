@@ -1,79 +1,31 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, DollarSign, PieChart, Activity } from "lucide-react";
-
-// Mock trading data
-const portfolioData = {
-  totalValue: 12847.32,
-  cashBalance: 3245.67,
-  unrealizedPnl: +542.18,
-  realizedPnl: +1204.45,
-  dayChange: +234.56,
-  dayChangePercent: +1.87,
-};
-
-const positions = [
-  {
-    id: 1,
-    market: "Trump wins 2024 Election",
-    side: "yes" as const,
-    shares: 150,
-    entryPrice: 0.64,
-    currentPrice: 0.72,
-    unrealizedPnl: +12.00,
-  },
-  {
-    id: 2,
-    market: "Bitcoin above $100k by EOY",
-    side: "no" as const,
-    shares: 89,
-    entryPrice: 0.23,
-    currentPrice: 0.18,
-    unrealizedPnl: +4.45,
-  },
-  {
-    id: 3,
-    market: "Lakers make playoffs",
-    side: "yes" as const,
-    shares: 200,
-    entryPrice: 0.78,
-    currentPrice: 0.71,
-    unrealizedPnl: -14.00,
-  },
-];
-
-const recentTrades = [
-  {
-    id: 1,
-    market: "Fed cuts rates in March",
-    side: "sell" as const,
-    shares: 75,
-    price: 0.45,
-    amount: 33.75,
-    timestamp: Date.now() - 3600000,
-  },
-  {
-    id: 2,
-    market: "OpenAI releases GPT-5",
-    side: "buy" as const,
-    shares: 120,
-    price: 0.82,
-    amount: 98.40,
-    timestamp: Date.now() - 7200000,
-  },
-  {
-    id: 3,
-    market: "Tesla stock above $300",
-    side: "buy" as const,
-    shares: 200,
-    price: 0.34,
-    amount: 68.00,
-    timestamp: Date.now() - 14400000,
-  },
-];
+import { TrendingUp, TrendingDown, DollarSign, PieChart, Activity, Loader2 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 export default function TradingPage() {
+  const positions = useQuery(api.trading.getPositions) || [];
+  const trades = useQuery(api.trading.getTrades) || [];
+  const portfolio = useQuery(api.trading.getPortfolio);
+
+  const isLoading = positions === undefined || trades === undefined || portfolio === undefined;
+
+  // Calculate some derived values
+  const totalUnrealizedPnl = positions.reduce((sum: number, pos: any) => sum + pos.unrealizedPnl, 0);
+  
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading trading data...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-auto">
       <div className="p-6 space-y-6">
@@ -92,9 +44,11 @@ export default function TradingPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${portfolioData.totalValue.toFixed(2)}</div>
+              <div className="text-2xl font-bold">
+                ${portfolio ? portfolio.totalValue.toFixed(2) : '0.00'}
+              </div>
               <p className="text-xs text-muted-foreground">
-                +${portfolioData.dayChange.toFixed(2)} ({portfolioData.dayChangePercent}%) today
+                Portfolio value
               </p>
             </CardContent>
           </Card>
@@ -105,7 +59,9 @@ export default function TradingPage() {
               <PieChart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${portfolioData.cashBalance.toFixed(2)}</div>
+              <div className="text-2xl font-bold">
+                ${portfolio ? portfolio.cashBalance.toFixed(2) : '0.00'}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Available for trading
               </p>
@@ -118,8 +74,10 @@ export default function TradingPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${portfolioData.unrealizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                ${portfolioData.unrealizedPnl.toFixed(2)}
+              <div className={`text-2xl font-bold ${
+                (portfolio?.unrealizedPnl || totalUnrealizedPnl) >= 0 ? 'text-green-400' : 'text-red-400'
+              }`}>
+                ${(portfolio?.unrealizedPnl || totalUnrealizedPnl).toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Open positions
@@ -133,8 +91,10 @@ export default function TradingPage() {
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${portfolioData.realizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                ${portfolioData.realizedPnl.toFixed(2)}
+              <div className={`text-2xl font-bold ${
+                (portfolio?.realizedPnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'
+              }`}>
+                ${portfolio ? portfolio.realizedPnl.toFixed(2) : '0.00'}
               </div>
               <p className="text-xs text-muted-foreground">
                 Closed trades
@@ -149,24 +109,30 @@ export default function TradingPage() {
             <CardTitle>Active Positions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {positions.map((position) => (
-                <div key={position.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <h3 className="font-medium">{position.market}</h3>
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      <span>Side: <span className={position.side === 'yes' ? 'text-green-400' : 'text-red-400'}>{position.side.toUpperCase()}</span></span>
-                      <span>Shares: {position.shares}</span>
-                      <span>Entry: ${position.entryPrice.toFixed(2)}</span>
-                      <span>Current: ${position.currentPrice.toFixed(2)}</span>
+            {positions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No active positions
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {positions.map((position: any) => (
+                  <div key={position._id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <h3 className="font-medium">{position.market}</h3>
+                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                        <span>Side: <span className={position.side === 'yes' ? 'text-green-400' : 'text-red-400'}>{position.side.toUpperCase()}</span></span>
+                        <span>Shares: {position.shares}</span>
+                        <span>Entry: ${position.entryPrice.toFixed(2)}</span>
+                        <span>Current: ${position.currentPrice.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <div className={`text-right font-bold ${position.unrealizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {position.unrealizedPnl >= 0 ? '+' : ''}${position.unrealizedPnl.toFixed(2)}
                     </div>
                   </div>
-                  <div className={`text-right font-bold ${position.unrealizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {position.unrealizedPnl >= 0 ? '+' : ''}${position.unrealizedPnl.toFixed(2)}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -176,24 +142,30 @@ export default function TradingPage() {
             <CardTitle>Recent Trades</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {recentTrades.map((trade) => (
-                <div key={trade.id} className="flex items-center justify-between p-3 border rounded">
-                  <div className="flex-1">
-                    <h4 className="font-medium text-sm">{trade.market}</h4>
-                    <div className="flex items-center space-x-3 text-xs text-muted-foreground">
-                      <span className={trade.side === 'buy' ? 'text-green-400' : 'text-red-400'}>
-                        {trade.side.toUpperCase()}
-                      </span>
-                      <span>{trade.shares} shares</span>
-                      <span>@${trade.price.toFixed(2)}</span>
-                      <span>{new Date(trade.timestamp).toLocaleString()}</span>
+            {trades.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No recent trades
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {trades.map((trade: any) => (
+                  <div key={trade._id} className="flex items-center justify-between p-3 border rounded">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm">{trade.market}</h4>
+                      <div className="flex items-center space-x-3 text-xs text-muted-foreground">
+                        <span className={trade.side === 'buy' ? 'text-green-400' : 'text-red-400'}>
+                          {trade.type.toUpperCase()}
+                        </span>
+                        <span>{trade.shares} shares</span>
+                        <span>@${trade.price.toFixed(2)}</span>
+                        <span>{new Date(trade.timestamp).toLocaleString()}</span>
+                      </div>
                     </div>
+                    <div className="font-bold">${trade.amount.toFixed(2)}</div>
                   </div>
-                  <div className="font-bold">${trade.amount.toFixed(2)}</div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

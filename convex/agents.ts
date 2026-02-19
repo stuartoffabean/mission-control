@@ -21,6 +21,25 @@ export const updateStatus = mutation({
   },
 });
 
+export const updateByName = mutation({
+  args: {
+    name: v.string(),
+    status: v.union(v.literal("idle"), v.literal("working"), v.literal("offline")),
+    lastActive: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db.query("agents")
+      .filter((q) => q.eq(q.field("name"), args.name))
+      .first();
+    if (agent) {
+      await ctx.db.patch(agent._id, {
+        status: args.status,
+        lastActive: args.lastActive || Date.now(),
+      });
+    }
+  },
+});
+
 export const seed = mutation({
   args: {},
   handler: async (ctx) => {

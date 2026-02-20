@@ -148,7 +148,7 @@ export const addTrade = mutation({
 export const updateTradeResult = mutation({
   args: {
     id: v.id("trades"),
-    result: v.union(v.literal("win"), v.literal("loss")),
+    result: v.union(v.literal("win"), v.literal("loss"), v.literal("pending")),
     pnl: v.number(),
   },
   handler: async (ctx, args) => {

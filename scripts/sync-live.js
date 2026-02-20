@@ -97,6 +97,36 @@ async function syncPaperTrades() {
     }
   }
 
+  // Live trades from weather trader
+  const livePath = "/data/workspace/weather-trader/live-trades.json";
+  if (fs.existsSync(livePath)) {
+    const data = JSON.parse(fs.readFileSync(livePath, "utf8"));
+    const trades2 = data.trades || [];
+    for (const t of trades2) {
+      const id = tradeId(t);
+      if (existingIds.has(id)) continue;
+      const hasResult = t.dollarPnl !== undefined || t.exitReason;
+      const result = hasResult
+        ? ((t.dollarPnl || 0) > 0 ? "win" : (t.dollarPnl || 0) < 0 ? "loss" : "pending")
+        : "pending";
+      await client.mutation(api.trading.addTrade, {
+        externalId: id,
+        market: t.question || `${t.city} ${t.date} ${t.bucket}${t.unit}`,
+        side: (t.action === "BUY_YES" || t.side === "yes") ? "yes" : "no",
+        shares: t.shares || 0,
+        price: t.entryPrice || 0,
+        amount: t.totalCost || 0,
+        type: "buy",
+        mode: "live",
+        strategy: t.strategy || "weather-v2",
+        result,
+        pnl: t.dollarPnl || 0,
+      });
+      existingIds.add(id);
+      synced++;
+    }
+  }
+
   // Directional paper trades
   const dirPath = "/data/workspace/polymarket-bot/directional-paper.json";
   if (fs.existsSync(dirPath)) {
@@ -104,15 +134,22 @@ async function syncPaperTrades() {
     const paperTrades = data.paperTrades || [];
     for (const t of paperTrades) {
       const id = tradeId(t);
-      if (existingIds.has(id)) continue; // Already in Convex — skip
+      if (existingIds.has(id)) continue;
+      const hasResult = t.dollarPnl !== undefined || t.exitReason;
+      const result = hasResult
+        ? ((t.dollarPnl || 0) > 0 ? "win" : (t.dollarPnl || 0) < 0 ? "loss" : "pending")
+        : "pending";
       await client.mutation(api.trading.addTrade, {
         externalId: id,
-        market: t.question || "Unknown",
+        market: t.question || t.market || "Unknown",
         side: t.action === "BUY_YES" ? "yes" : t.action === "BUY_NO" ? "no" : "yes",
         shares: t.shares || Math.floor((t.totalCost || 10) / Math.max(t.entryPrice || 0.5, 0.001)),
         price: t.entryPrice || 0,
         amount: t.totalCost || 10,
         type: "buy",
+        strategy: t.strategy || "directional",
+        result,
+        pnl: t.dollarPnl || 0,
       });
       existingIds.add(id);
       synced++;

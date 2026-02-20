@@ -117,6 +117,7 @@ export const upsertPosition = mutation({
 
 export const addTrade = mutation({
   args: {
+    externalId: v.optional(v.string()),
     market: v.string(),
     side: v.union(v.literal("yes"), v.literal("no")),
     shares: v.number(),
@@ -129,6 +130,13 @@ export const addTrade = mutation({
     pnl: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // If externalId provided, check for duplicate
+    if (args.externalId) {
+      const existing = await ctx.db.query("trades")
+        .filter((q) => q.eq(q.field("externalId"), args.externalId))
+        .first();
+      if (existing) return existing._id; // Already exists — skip
+    }
     return await ctx.db.insert("trades", {
       ...args,
       mode: args.mode || "paper",

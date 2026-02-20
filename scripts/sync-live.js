@@ -26,37 +26,52 @@ async function syncCrons(cronJobs) {
   return synced;
 }
 
+// Generate a stable trade ID from trade data (for dedup)
+function tradeId(t) {
+  const key = `${t.city || t.market || ""}|${t.date || ""}|${t.bucket || ""}|${t.action || t.side || ""}|${t.timestamp || t.entryTime || ""}|${t.entryPrice || t.price || 0}`;
+  // Simple hash
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = ((h << 5) - h + key.charCodeAt(i)) | 0;
+  return `trade_${Math.abs(h).toString(36)}`;
+}
+
 // Sync paper trades from weather + directional scanners
 async function syncPaperTrades() {
   let synced = 0;
+
+  // Get ALL existing trades from Convex for ID-based dedup
+  const existing = await client.query(api.trading.getTrades);
+  const existingIds = new Set((existing || []).map(t => t.externalId).filter(Boolean));
 
   // Weather paper trades
   const weatherPath = "/data/workspace/polymarket-bot/weather-v2-paper.json";
   if (fs.existsSync(weatherPath)) {
     const data = JSON.parse(fs.readFileSync(weatherPath, "utf8"));
-    // Get existing trade count to avoid duplicates
-    const existing = await client.query(api.trading.getTrades);
-    const existingCount = existing?.length || 0;
-
-    let newTrades = [];
-    for (const run of data.runs || []) {
-      for (const rec of run.recommendations || []) {
-        if (!rec.action?.startsWith("BUY")) continue;
-        newTrades.push({
-          market: rec.question || `${rec.city} ${rec.date} ${rec.bucket}${rec.unit}`,
-          side: rec.action === "BUY_YES" ? "yes" : "no",
-          shares: Math.floor(10 / Math.max(rec.marketPrice || 0.5, 0.001)),
-          price: rec.marketPrice || 0,
-          amount: 10,
-          type: "buy",
-        });
+    // Support both formats: paperTrades[] (new) and runs[].recommendations[] (old)
+    let trades = [];
+    if (data.paperTrades) {
+      trades = data.paperTrades;
+    } else if (data.runs) {
+      for (const run of data.runs) {
+        for (const rec of run.recommendations || []) {
+          if (rec.action?.startsWith("BUY")) trades.push(rec);
+        }
       }
     }
 
-    // Only sync new trades (skip already synced)
-    const toSync = newTrades.slice(existingCount);
-    for (const trade of toSync) {
-      await client.mutation(api.trading.addTrade, trade);
+    for (const t of trades) {
+      const id = tradeId(t);
+      if (existingIds.has(id)) continue; // Already in Convex — skip
+      await client.mutation(api.trading.addTrade, {
+        externalId: id,
+        market: t.question || `${t.city} ${t.date} ${t.bucket}${t.unit}`,
+        side: (t.action === "BUY_YES" || t.side === "yes") ? "yes" : "no",
+        shares: t.shares || Math.floor((t.paperTradeSize || t.totalCost || 10) / Math.max(t.entryPrice || t.marketPrice || 0.5, 0.001)),
+        price: t.entryPrice || t.marketPrice || 0,
+        amount: t.paperTradeSize || t.totalCost || 10,
+        type: "buy",
+      });
+      existingIds.add(id);
       synced++;
     }
   }
@@ -67,22 +82,19 @@ async function syncPaperTrades() {
     const data = JSON.parse(fs.readFileSync(dirPath, "utf8"));
     const paperTrades = data.paperTrades || [];
     for (const t of paperTrades) {
-      if (!t._synced) {
-        await client.mutation(api.trading.addTrade, {
-          market: t.question || "Unknown",
-          side: t.action === "BUY_YES" ? "yes" : t.action === "BUY_NO" ? "no" : "yes",
-          shares: t.shares || Math.floor((t.totalCost || 10) / Math.max(t.entryPrice || 0.5, 0.001)),
-          price: t.entryPrice || 0,
-          amount: t.totalCost || 10,
-          type: "buy",
-        });
-        t._synced = true;
-        synced++;
-      }
-    }
-    // Mark synced
-    if (synced > 0) {
-      fs.writeFileSync(dirPath, JSON.stringify(data, null, 2));
+      const id = tradeId(t);
+      if (existingIds.has(id)) continue; // Already in Convex — skip
+      await client.mutation(api.trading.addTrade, {
+        externalId: id,
+        market: t.question || "Unknown",
+        side: t.action === "BUY_YES" ? "yes" : t.action === "BUY_NO" ? "no" : "yes",
+        shares: t.shares || Math.floor((t.totalCost || 10) / Math.max(t.entryPrice || 0.5, 0.001)),
+        price: t.entryPrice || 0,
+        amount: t.totalCost || 10,
+        type: "buy",
+      });
+      existingIds.add(id);
+      synced++;
     }
   }
 

@@ -43,6 +43,7 @@ export default defineSchema({
   }),
   
   trades: defineTable({
+    externalId: v.optional(v.string()),
     market: v.string(),
     side: v.union(v.literal("yes"), v.literal("no")),
     shares: v.number(),

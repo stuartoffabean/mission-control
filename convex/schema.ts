@@ -68,6 +68,19 @@ export default defineSchema({
     mode: v.optional(v.union(v.literal("live"), v.literal("paper"))),
   }),
   
+  dailyLogs: defineTable({
+    date: v.string(), // YYYY-MM-DD
+    title: v.string(),
+    summary: v.string(), // markdown
+    sections: v.array(v.object({
+      heading: v.string(),
+      bullets: v.array(v.string()),
+    })),
+    tags: v.array(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_date", ["date"]),
+  
   agents: defineTable({
     name: v.string(),
     role: v.string(),

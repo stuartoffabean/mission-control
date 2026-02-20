@@ -211,3 +211,10 @@ export const updateTradePrice = mutation({
     await ctx.db.patch(id, filtered);
   },
 });
+
+export const removeTrade = mutation({
+  args: { id: v.id("trades") },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.id);
+  },
+});

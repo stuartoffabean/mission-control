@@ -61,7 +61,25 @@ async function syncPaperTrades() {
 
     for (const t of trades) {
       const id = tradeId(t);
-      if (existingIds.has(id)) continue; // Already in Convex — skip
+      if (existingIds.has(id)) {
+        // Already exists — but check if we need to update resolution
+        if (t.dollarPnl !== undefined || t.exitReason) {
+          const result = (t.dollarPnl || 0) > 0 ? "win" : (t.dollarPnl || 0) < 0 ? "loss" : "pending";
+          const match = (existing || []).find(e => e.externalId === id);
+          if (match && match.result === "pending") {
+            await client.mutation(api.trading.updateTradeResult, {
+              id: match._id,
+              result,
+              pnl: t.dollarPnl || 0,
+            });
+          }
+        }
+        continue;
+      }
+      const hasResult = t.dollarPnl !== undefined || t.exitReason;
+      const result = hasResult
+        ? ((t.dollarPnl || 0) > 0 ? "win" : (t.dollarPnl || 0) < 0 ? "loss" : "pending")
+        : "pending";
       await client.mutation(api.trading.addTrade, {
         externalId: id,
         market: t.question || `${t.city} ${t.date} ${t.bucket}${t.unit}`,
@@ -70,6 +88,9 @@ async function syncPaperTrades() {
         price: t.entryPrice || t.marketPrice || 0,
         amount: t.paperTradeSize || t.totalCost || 10,
         type: "buy",
+        strategy: "weather-v2",
+        result,
+        pnl: t.dollarPnl || 0,
       });
       existingIds.add(id);
       synced++;

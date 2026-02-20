@@ -1,0 +1,85 @@
+city,model,weight,bias_correction_C
+NYC,gfs,1.5,1.38
+NYC,ecmwf,0.7,2.45
+NYC,icon,2,0.63
+NYC,jma,0.5,2.86
+NYC,gem,1,2.15
+NYC,ukmo,1.2,1.84
+NYC,vc,1.5,0.13
+Chicago,gfs,1.5,0.91
+Chicago,ecmwf,0.7,1.83
+Chicago,icon,1.2,1.44
+Chicago,jma,0.5,1.25
+Chicago,gem,2,1
+Chicago,ukmo,1,0.72
+Chicago,vc,1.5,0.25
+Miami,gfs,1.2,0.04
+Miami,ecmwf,0.7,1.24
+Miami,icon,2,0.21
+Miami,jma,1,0.28
+Miami,gem,1.5,-0.11
+Miami,ukmo,0.5,1
+Miami,vc,1.5,0.16
+Atlanta,gfs,2,1.16
+Atlanta,ecmwf,1.2,1.46
+Atlanta,icon,1.5,1.83
+Atlanta,jma,0.7,2.27
+Atlanta,gem,1,1.62
+Atlanta,ukmo,0.5,2.77
+Atlanta,vc,1.5,0.31
+Dallas,gfs,1.5,0.46
+Dallas,ecmwf,1.2,1.08
+Dallas,icon,2,0.23
+Dallas,jma,0.5,1.83
+Dallas,gem,1,1.19
+Dallas,ukmo,0.7,1.82
+Dallas,vc,1.5,0.63
+Seattle,gfs,1,0.28
+Seattle,ecmwf,1.2,0.37
+Seattle,icon,2,0.05
+Seattle,jma,1.5,0.24
+Seattle,gem,0.5,1.02
+Seattle,ukmo,0.7,0.64
+Seattle,vc,1.5,0.19
+Toronto,gfs,1.5,0.85
+Toronto,ecmwf,0.5,1.92
+Toronto,icon,1,1.75
+Toronto,jma,0.7,1.36
+Toronto,gem,2,0.92
+Toronto,ukmo,1.2,1.66
+Toronto,vc,1.5,0.02
+London,gfs,1.2,0.65
+London,ecmwf,1.5,0.69
+London,icon,2,0.43
+London,jma,0.5,0.65
+London,gem,0.7,0.73
+London,ukmo,1,0.71
+London,vc,1.5,0.22
+Seoul,gfs,0.7,-0.1
+Seoul,ecmwf,2,0.69
+Seoul,icon,1.2,1.08
+Seoul,jma,1,0.17
+Seoul,gem,1.5,0.76
+Seoul,ukmo,0.5,1.1
+Seoul,vc,1.5,-0.05
+Buenos Aires,gfs,0.7,-2.58
+Buenos Aires,ecmwf,1.2,1.02
+Buenos Aires,icon,2,0.63
+Buenos Aires,jma,0.5,2.68
+Buenos Aires,gem,1,1.88
+Buenos Aires,ukmo,1.5,0.38
+Buenos Aires,vc,1.5,0.1
+Ankara,gfs,1.2,0.37
+Ankara,ecmwf,0.5,0.16
+Ankara,icon,2,0.37
+Ankara,jma,1.5,-0.12
+Ankara,gem,0.7,0.67
+Ankara,ukmo,1,0.67
+Ankara,vc,1.5,0.31
+Wellington,gfs,1.2,1.2
+Wellington,ecmwf,0.7,1.39
+Wellington,icon,1,1.55
+Wellington,jma,0.5,2.47
+Wellington,gem,1.5,0.53
+Wellington,ukmo,2,0.02
+Wellington,vc,1.5,0.56

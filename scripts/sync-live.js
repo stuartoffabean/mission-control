@@ -86,7 +86,7 @@ async function syncPaperTrades() {
         side: (t.action === "BUY_YES" || t.side === "yes") ? "yes" : "no",
         shares: t.shares || Math.floor((t.paperTradeSize || t.totalCost || 10) / Math.max(t.entryPrice || t.marketPrice || 0.5, 0.001)),
         price: t.entryPrice || t.marketPrice || 0,
-        amount: t.paperTradeSize || t.totalCost || 10,
+        amount: t.totalCost || t.paperTradeSize || 10,
         type: "buy",
         strategy: "weather-v2",
         result,

@@ -3,16 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Home, TrendingUp, Calendar, Brain, Users, Monitor, Menu } from "lucide-react";
+import { Home, TrendingUp, Menu } from "lucide-react";
 import { useState } from "react";
 
 const navigation = [
   { name: "Mission", href: "/", icon: Home },
   { name: "Trading", href: "/trading", icon: TrendingUp },
-  { name: "Calendar", href: "/calendar", icon: Calendar },
-  { name: "Memory", href: "/memory", icon: Brain },
-  { name: "Team", href: "/team", icon: Users },
-  { name: "Office", href: "/office", icon: Monitor },
 ];
 
 function NavItems({ pathname }: { pathname: string }) {
@@ -45,30 +41,23 @@ export function Sidebar() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="md:hidden fixed top-3 left-3 z-50 rounded-md bg-card border px-2 py-2"
-      >
+      <button onClick={() => setOpen(true)} className="md:hidden fixed top-3 left-3 z-50 rounded-md bg-card border px-2 py-2">
         <Menu className="h-4 w-4" />
       </button>
 
       <aside className="hidden md:flex h-screen w-64 flex-col bg-card border-r notion-sidebar">
         <div className="h-14 px-4 flex items-center border-b">
-          <h1 className="text-sm font-semibold tracking-wide">STUART · MISSION CONTROL</h1>
+          <h1 className="text-sm font-semibold tracking-wide">MISSION CONTROL</h1>
         </div>
-        <div className="p-3 space-y-1 flex-1 overflow-auto">
-          <NavItems pathname={pathname} />
-        </div>
-        <div className="p-4 border-t text-xs text-muted-foreground">● Stuart online</div>
+        <div className="p-3 space-y-1 flex-1 overflow-auto"><NavItems pathname={pathname} /></div>
+        <div className="p-4 border-t text-xs text-muted-foreground">Clean mode · single focus</div>
       </aside>
 
       {open && (
         <div className="md:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setOpen(false)}>
           <aside className="h-full w-72 bg-card border-r p-3" onClick={(e) => e.stopPropagation()}>
-            <div className="h-10 px-2 flex items-center text-sm font-semibold">STUART · MISSION</div>
-            <div className="space-y-1">
-              <NavItems pathname={pathname} />
-            </div>
+            <div className="h-10 px-2 flex items-center text-sm font-semibold">MISSION CONTROL</div>
+            <div className="space-y-1"><NavItems pathname={pathname} /></div>
           </aside>
         </div>
       )}

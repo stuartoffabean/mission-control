@@ -44,7 +44,7 @@ async function syncPaperTrades() {
   const existingIds = new Set((existing || []).map(t => t.externalId).filter(Boolean));
 
   // Weather paper trades
-  const weatherPath = "/data/workspace/polymarket-bot/weather-v2-paper.json";
+  const weatherPath = "/data/workspace/weather-trader/scan-ledger.json";
   if (fs.existsSync(weatherPath)) {
     const data = JSON.parse(fs.readFileSync(weatherPath, "utf8"));
     // Support both formats: paperTrades[] (new) and runs[].recommendations[] (old)
@@ -128,7 +128,7 @@ async function syncPaperTrades() {
   }
 
   // Directional paper trades
-  const dirPath = "/data/workspace/polymarket-bot/directional-paper.json";
+  const dirPath = "/data/workspace/weather-trader/directional-paper.json";
   if (fs.existsSync(dirPath)) {
     const data = JSON.parse(fs.readFileSync(dirPath, "utf8"));
     const paperTrades = data.paperTrades || [];
@@ -162,7 +162,7 @@ async function syncPaperTrades() {
 // Sync wallet/portfolio
 async function syncPortfolio() {
   // Try to read from TRADING-STATE.json
-  const statePath = "/data/workspace/polymarket-bot/TRADING-STATE.json";
+  const statePath = "/data/workspace/weather-trader/TRADING-STATE.json";
   if (fs.existsSync(statePath)) {
     const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
     await client.mutation(api.trading.addSnapshot, {
@@ -194,8 +194,18 @@ async function main() {
   if (args.includes("--stdin")) {
     const chunks = [];
     for await (const chunk of process.stdin) chunks.push(chunk);
-    const cronData = JSON.parse(Buffer.concat(chunks).toString());
-    results.crons = await syncCrons(cronData.jobs || cronData);
+    const raw = Buffer.concat(chunks).toString().trim();
+    if (raw) {
+      try {
+        const cronData = JSON.parse(raw);
+        results.crons = await syncCrons(cronData.jobs || cronData);
+      } catch (e) {
+        results.crons = 0;
+        results.cronParseError = e.message;
+      }
+    } else {
+      results.crons = 0;
+    }
   }
 
   if (args.includes("--trades") || args.includes("--all")) {

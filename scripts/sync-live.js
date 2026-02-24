@@ -161,19 +161,53 @@ async function syncPaperTrades() {
 
 // Sync wallet/portfolio
 async function syncPortfolio() {
-  // Try to read from TRADING-STATE.json
+  // 1) Prefer explicit state file if present
   const statePath = "/data/workspace/weather-trader/TRADING-STATE.json";
   if (fs.existsSync(statePath)) {
     const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
     await client.mutation(api.trading.addSnapshot, {
-      totalValue: state.totalValue || state.cashBalance || 325.40,
-      cashBalance: state.cashBalance || 325.40,
+      totalValue: state.totalValue || state.cashBalance || 0,
+      cashBalance: state.cashBalance || 0,
       unrealizedPnl: state.unrealizedPnl || 0,
-      realizedPnl: state.realizedPnl || -123.18,
+      realizedPnl: state.realizedPnl || 0,
     });
     return true;
   }
-  return false;
+
+  // 2) Fallback: derive from executor /positions + latest live-trades
+  try {
+    const res = await fetch("http://localhost:3002/positions", { cache: "no-store" });
+    if (!res.ok) throw new Error(`positions_http_${res.status}`);
+    const j = await res.json();
+    const positions = j.positions || [];
+
+    const cash = Number(j.cashBalance || j.cash || 0);
+    let unreal = 0;
+    for (const p of positions) {
+      unreal += Number(p.unrealizedPnl || 0);
+    }
+
+    // realized from live-trades ledger if present
+    let realized = 0;
+    const livePath = "/data/workspace/weather-trader/live-trades.json";
+    if (fs.existsSync(livePath)) {
+      const data = JSON.parse(fs.readFileSync(livePath, "utf8"));
+      for (const t of (data.trades || [])) {
+        if (t.dollarPnl !== undefined && t.dollarPnl !== null) realized += Number(t.dollarPnl || 0);
+      }
+    }
+
+    const totalValue = cash + unreal;
+    await client.mutation(api.trading.addSnapshot, {
+      totalValue,
+      cashBalance: cash,
+      unrealizedPnl: unreal,
+      realizedPnl: realized,
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function main() {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Shield, Activity, Brain, AlertTriangle } from "lucide-react";
 
@@ -9,15 +10,31 @@ type Snap = any;
 
 export default function HomePage() {
   const [snap, setSnap] = useState<Snap | null>(null);
+  const [approvals, setApprovals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     try {
-      const r = await fetch("/api/ops-snapshot", { cache: "no-store" });
-      setSnap(await r.json());
+      const [r1, r2] = await Promise.all([
+        fetch("/api/ops-snapshot", { cache: "no-store" }),
+        fetch("/api/approvals", { cache: "no-store" }),
+      ]);
+      setSnap(await r1.json());
+      const a = await r2.json();
+      setApprovals(a?.pending || []);
     } finally {
       setLoading(false);
     }
+  };
+
+  const doApproval = async (idx: number, action: "approve" | "reject") => {
+    const reason = window.prompt(`${action.toUpperCase()} reason (optional):`) || "";
+    await fetch("/api/approvals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idx, action, reason }),
+    });
+    await load();
   };
 
   useEffect(() => {
@@ -67,6 +84,23 @@ export default function HomePage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="notion-card">
+          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Brain className="h-4 w-4"/> Approvals</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="text-muted-foreground">Pending approvals: {approvals.length}</div>
+            {approvals.length === 0 && <div className="text-xs text-muted-foreground">No pending items.</div>}
+            {approvals.slice(0, 3).map((a: any) => (
+              <div key={a._idx} className="rounded-md bg-muted/40 p-2 space-y-2">
+                <div className="text-xs">{a.reason || "Pending decision"}</div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => doApproval(a._idx, "approve")}>Approve</Button>
+                  <Button size="sm" variant="destructive" onClick={() => doApproval(a._idx, "reject")}>Reject</Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
         <Card className="notion-card">
           <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4"/> System details</CardTitle></CardHeader>
